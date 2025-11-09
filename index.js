@@ -5,7 +5,8 @@ const app = express();
 const mongoose = require('mongoose');
 let bodyParse = require('body-parser')
 const dns = require('dns');
-const { URL } = require('url')
+const { URL } = require('url');
+
 
 // Basic Configuration
 mongoose.connect(process.env.DB_URL);
@@ -13,7 +14,7 @@ const port = process.env.PORT || 3000;
 
 const urlSchema = new mongoose.Schema({
   original_url: {type: String, required: true},
-  short_url: {type: String}
+  short_url: {type: Number}
 })
 
 const urlModel = mongoose.model("Url", urlSchema);
@@ -56,14 +57,13 @@ app.post('/api/shorturl', function(req, res) {
   try{
     urlObj = new URL(url)
   //  console.log(urlObj)
-      dns.lookup(urlObj.hostname, async (err, address, family) => {
+      dns.lookup(urlObj.hostname, async (err, address) => {
         if(err || !address){
           return res.json({
-            message: "invalid url"
+            error: "invalid url"
           })
         }
         //if we have a valid url
-        else{
           let original_url = urlObj.href;
 
           urlModel.findOne({original_url: original_url}).then((foundUrl)=> {
@@ -99,12 +99,12 @@ app.post('/api/shorturl', function(req, res) {
               }
             }
           })
-        }
+        
       })
   }
   catch{
     return res.json({
-      message: "invalid url"
+      error: "invalid url"
     })
   }
 });
