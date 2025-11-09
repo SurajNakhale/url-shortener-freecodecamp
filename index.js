@@ -5,8 +5,7 @@ const app = express();
 const mongoose = require('mongoose');
 let bodyParse = require('body-parser')
 const dns = require('dns');
-const { URL } = require('url');
-
+const { URL } = require('url')
 
 // Basic Configuration
 mongoose.connect(process.env.DB_URL);
@@ -31,71 +30,77 @@ app.get('/', function(req, res) {
   res.sendFile(process.cwd() + '/views/index.html');
 });
 
-app.post('/api/shorturl', async function (req, res) {
-  const inputUrl = req.body.url;
 
-  try {
-    const urlObj = new URL(inputUrl);
+app.get('/api/shorturl/:short_url', (req, res)=>{
+      const short_url = req.params.short_url;
 
-    // Check protocol
-    if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
-      return res.json({ error: 'invalid url' });
-    }
+      urlModel.findOne({ short_url: short_url}).then((foundUrl) =>{
+        console.log(foundUrl);
 
-    dns.lookup(urlObj.hostname, async (err, address) => {
-      if (err || !address) {
-        return res.json({ error: 'invalid url' });
-      }
-
-      try {
-        // Check if already exists
-        const existing = await urlModel.findOne({ original_url: urlObj.href });
-        if (existing) {
-          return res.json({
-            original_url: existing.original_url,
-            short_url: existing.short_url
-          });
+        if(foundUrl){
+          let original_url = foundUrl.original_url;
+          res.redirect(original_url);
         }
+        else{
+          return res.json({error: "short_Url not found"})
+        }
+      })
+})
 
-        // Find last short_url
-        const latest = await urlModel.findOne().sort({ short_url: -1 }).exec();
-        const nextShort = latest ? latest.short_url + 1 : 1;
 
-        const newUrl = new urlModel({
-          original_url: urlObj.href,
-          short_url: nextShort
-        });
+// Your first API endpoint
+app.post('/api/shorturl', function(req, res) {
+  
+  let url = req.body.url;
+  try{
+    urlObj = new URL(url)
+  //  console.log(urlObj)
+    
+  //validate host name
+      dns.lookup(urlObj.hostname, async (err, address) => {
 
-        const saved = await newUrl.save();
 
-        return res.json({
-          original_url: saved.original_url,
-          short_url: saved.short_url
-        });
-      } catch (dbErr) {
-        console.error(dbErr);
-        return res.status(500).json({ error: 'database error' });
-      }
-    });
-  } catch {
-    return res.json({ error: 'invalid url' });
-  }
-});
+        if(err || !address){
+          return res.json({ error: "invalid url" })
+        }
+        else{
+          //if we have a valid url
+          let original_url = urlObj.href;
 
-app.get('/api/shorturl/:short_url', async (req, res) => {
-  const short = Number(req.params.short_url);
+          //search if that url already exist in the database
+          const existingUrl = await urlModel.findOne({ original_url });
+          if(existingUrl){
+              return res.json({
+                original_url: existingUrl.original_url,
+                short_url: existingUrl.short_url
+              })
+          }
+              //find latest short url
+              const latestUrl = await urlModel.findOne({}).sort({short_url: -1}).exec();
+              let short_url = 1;
 
-  try {
-    const found = await urlModel.findOne({ short_url: short });
-    if (found) {
-      return res.redirect(found.original_url);
-    } else {
-      return res.json({ error: 'No short URL found for the given input' });
+              if(latestUrl){
+                short_url = latestUrl.short_url + 1;
+                console.log(short_url);
+              }
+
+              let newUrl = new urlModel({
+                  original_url,
+                  short_url
+                });
+
+                await newUrl.save()
+                      .then(saveUrl => res.json({
+                        original_url: saveUrl.original_url,
+                        short_url: saveUrl.short_url
+                      }));
+        }
+      })
     }
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'database error' });
-  }
+
+    catch{
+      return res.json({ error: "invalid url" })
+    }
 });
 
 app.listen(port, function() {
