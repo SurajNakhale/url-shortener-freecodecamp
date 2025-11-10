@@ -13,7 +13,7 @@ const port = process.env.PORT || 3000;
 
 const urlSchema = new mongoose.Schema({
   original_url: {type: String, required: true},
-  short_url: {type: Number}
+  short_url: {type: String}
 })
 
 const urlModel = mongoose.model("Url", urlSchema);
@@ -31,20 +31,18 @@ app.get('/', function(req, res) {
 });
 
 
-app.get('/api/shorturl/:short_url', (req, res)=>{
+app.get('/api/shorturl/:short_url', async (req, res)=>{
       const short_url = req.params.short_url;
-
-      urlModel.findOne({ short_url: short_url}).then((foundUrl) =>{
-        console.log(foundUrl);
-
+      const foundUrl = await urlModel.findOne({ short_url: short_url});
+      console.log(foundUrl);
         if(foundUrl){
           let original_url = foundUrl.original_url;
-          res.redirect(original_url);
+          return res.redirect(original_url);
         }
         else{
           return res.json({error: "short_Url not found"})
         }
-      })
+    
 })
 
 
@@ -58,8 +56,6 @@ app.post('/api/shorturl', function(req, res) {
     
   //validate host name
       dns.lookup(urlObj.hostname, async (err, address) => {
-
-
         if(err || !address){
           return res.json({ error: "invalid url" })
         }
